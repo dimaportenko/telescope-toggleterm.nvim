@@ -13,6 +13,45 @@ if not status_ok then
    error "Cannot find toggleterm!"
 end
 
+local function next_id()
+   local all = require("toggleterm.terminal").get_all(true)
+
+   for index, term in pairs(all) do
+      if index ~= term.id then return index end
+   end
+   return #all + 1
+end
+
+
+local function toggle_term(bfnr)
+   local bufnr = tonumber(bfnr)
+   local all_terminals = require("toggleterm.terminal").get_all(true)
+   local id = nil
+   for _, term in pairs(all_terminals) do
+      if term.bufnr == bufnr then
+         id = term.id
+      end
+   end
+
+   if id then
+      require("toggleterm").toggle_command(nil, id)
+   else
+      id = next_id()
+      ---@diagnostic disable-next-line: param-type-mismatch
+      if vim.api.nvim_buf_is_valid(bufnr) == false then
+         error("bufnr is not valid")
+      end
+
+      local cmdTerm = require("toggleterm.terminal").Terminal:new({
+         id            = id,
+         bufnr         = bufnr,
+         hidden        = true,
+         close_on_exit = false,
+      })
+      cmdTerm:toggle()
+   end
+end
+
 local M = {}
 M.open = function(opts)
    local bufnrs = vim.tbl_filter(function(b)
@@ -53,10 +92,26 @@ M.open = function(opts)
       }
       table.insert(buffers, element)
    end
+
+   -- local terminals = require("toggleterm.terminal").get_all(true)
+   -- teminals tabels of objects which contains id and name
+   -- create results with id and name
+   -- then use the id to toggle the terminal
+   -- ──────────────────────────────────────────────────────────────────────
+   -- local results = {}
+   -- for _, terminal in ipairs(terminals) do
+   --    local element = {
+   --       id = terminal.id,
+   --       name = terminal.name,
+   --       bufnr = terminal.bufnr,
+   --    }
+   --    table.insert(results, element)
+   -- end
    -- ──────────────────────────────────────────────────────────────────────
    pickers.new(opts, {
       prompt_title = "Terminal Buffers",
       finder = finders.new_table {
+         -- results = results,
          results = buffers,
          entry_maker = function(entry)
             return {
@@ -76,11 +131,17 @@ M.open = function(opts)
                return
             end
             local bufnr = tostring(selection.value.bufnr)
-            local toggle_number = selection.value.toggle_number
-            require("toggleterm").toggle_command(bufnr, toggle_number)
-            vim.defer_fn(function()
-               vim.cmd "stopinsert"
-            end, 0)
+            -- local toggle_number = selection.value.toggle_number
+            -- P(selection.value)
+            -- P(require("toggleterm.terminal").get_all(true))
+            -- P(results)
+
+            -- require("toggleterm").toggle_command(nil, selection.value.id)
+            -- require("toggleterm").toggle_command(nil, toggle_number)
+            toggle_term(bufnr)
+            -- vim.defer_fn(function()
+            --    vim.cmd "stopinsert"
+            -- end, 0)
          end)
          -- ╭────────────────────────────────────────────────────────────────────╮
          -- │                           setup mappings                           │

@@ -1,10 +1,6 @@
-local pickers, finders, actions, actions_state, conf
+local actions_state
 if pcall(require, "telescope") then
-   pickers = require "telescope.pickers"
-   finders = require "telescope.finders"
-   actions = require "telescope.actions"
    actions_state = require "telescope.actions.state"
-   conf = require("telescope.config").values
 else
    error "Cannot find telescope!"
 end
