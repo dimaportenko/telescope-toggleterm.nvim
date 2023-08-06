@@ -1,9 +1,10 @@
-local pickers, finders, actions, conf
+local pickers, finders, actions, conf, previewers
 if pcall(require, "telescope") then
    pickers = require "telescope.pickers"
    finders = require "telescope.finders"
    actions = require "telescope.actions"
    conf = require("telescope.config").values
+   previewers = require "telescope.previewers"
 else
    error "Cannot find telescope!"
 end
@@ -14,8 +15,32 @@ end
 
 local open_action = require('lib.actions').open
 
+local function getSubstringAfterSecondSlash(input)
+    local first = string.find(input, "//")
+    if first then
+        local second = string.find(input, "//", first + 1)
+        if second then
+            return string.sub(input, second + 2)
+        end
+    end
+    return nil
+end
+
 local M = {}
 M.open = function(opts)
+  local default_opts = {
+    layout_config = {
+      preview_width = 0.6,
+    },
+  }
+
+  opts = opts or {}
+  
+  -- iterate over key-value pairs in opts
+  for k, v in pairs(opts) do
+    default_opts[k] = v
+  end
+  
    local bufnrs = vim.tbl_filter(function(b)
       return vim.api.nvim_buf_get_option(b, "filetype") == "toggleterm"
    end, vim.api.nvim_list_bufs())
@@ -37,6 +62,7 @@ M.open = function(opts)
          lnum = info.lnum,
          loaded = info.loaded,
          name = info.name,
+         title = getSubstringAfterSecondSlash(info.name),
          windows = info.windows,
          terminal_job_id = info.variables.terminal_job_id,
          terminal_job_pid = info.variables.terminal_job_pid,
@@ -45,7 +71,7 @@ M.open = function(opts)
       table.insert(buffers, element)
    end
 
-   pickers.new(opts, {
+   pickers.new(default_opts, {
       prompt_title = "Terminal Buffers",
       finder = finders.new_table {
          -- results = results,
@@ -54,8 +80,8 @@ M.open = function(opts)
             return {
                value = entry,
                text = tostring(entry.bufnr),
-               display = tostring(entry.name),
-               ordinal = tostring(entry.bufnr),
+               display = tostring(entry.title),
+               ordinal = tostring(entry.title),
             }
          end,
       },
@@ -63,9 +89,7 @@ M.open = function(opts)
       attach_mappings = function(prompt_bufnr, map)
          actions.select_default:replace(open_action)
 
-         -- ╭────────────────────────────────────────────────────────────────────╮
-         -- │                           setup mappings                           │
-         -- ╰────────────────────────────────────────────────────────────────────╯
+         -- setup mappings
          local mappings = require("config").options.telescope_mappings
          for keybind, action in pairs(mappings) do
             map("i", keybind, function()
@@ -74,6 +98,11 @@ M.open = function(opts)
          end
          return true
       end,
+    previewer = previewers.new_buffer_previewer {
+         define_preview = function(self, entry, _) -- 3d param is status
+            vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, true, vim.api.nvim_buf_get_lines(entry.value.bufnr, 0, -1, false))
+         end
+      }
    }):find()
 end
 return M
